@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  wordpress:
+    image: wordpress:latest
+    deploy:
+      replicas: 3                      # Three replicas for load balancing
+      restart_policy:
+        condition: on-failure
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306     # MySQL service name and port
+      WORDPRESS_DB_USER: SQL_user       # MySQL user (secret reference)
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/wordpress_db_password
+    ports:
+      - "80:80"                         # Expose WordPress on port 80
+    secrets:
+      - wordpress_db_password           # Use Docker secret for DB password
+    networks:
+      - frontend
+      - backend                         # Backend network for DB communication
+
+  mysql:
+    image: mysql:latest
+    deploy:
+      replicas: 1                       # Single replica for MySQL
+      restart_policy:
+        condition: on-failure
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_rootpassword
+    volumes:
+      - mysql_data:/var/lib/mysql       # Persistent storage for MySQL data
+    secrets:
+      - mysql_rootpassword              
+      - SQL_user                        
+    networks:
+      - backend                         # Backend network for secure DB access
+
+secrets:
+  SQL_user:
+    external: true                      # Refers to the external Docker secret
+  mysql_rootpassword:
+    external: true                      # Refers to the external Docker secret
+  wordpress_db_password:
+    external: true                      # Refers to the external Docker secret
+
+volumes:
+  mysql_data:
+    driver: local                       # Local Docker volume for persistent MySQL data
+
+networks:
+  frontend:
+    driver: overlay                     # Overlay network for WordPress
+  backend:
+    driver: overlay                     # Overlay network for internal DB communication
